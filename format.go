@@ -16,9 +16,39 @@ const (
 	termTimeFormat = "01-02|15:04:05"
 	floatFormat    = 'f'
 	termMsgJust    = 40
+	termCtxMaxPadding = 40
 )
 
-// Format  is the interface implemented by StreamHandler formatters.
+// locationTrims are trimmed for display to avoid unwieldy log lines.
+var locationTrims = []string{
+	"github.com/ethereum/go-ethereum/",
+}
+
+// PrintOrigins sets or unsets log location (file:line) printing for terminal
+// format output.
+func PrintOrigins(print bool) {
+	if print {
+		atomic.StoreUint32(&locationEnabled, 1)
+	} else {
+		atomic.StoreUint32(&locationEnabled, 0)
+	}
+}
+
+// locationEnabled is an atomic flag controlling whether the terminal formatter
+// should append the log locations too when printing entries.
+var locationEnabled uint32
+
+// locationLength is the maxmimum path length encountered, which all logs are
+// padded to to aid in alignment.
+var locationLength uint32
+
+// fieldPadding is a global map with maximum field value lengths seen until now
+// to allow padding log contexts in a bit smarter way.
+var fieldPadding = make(map[string]int)
+
+// fieldPaddingLock is a global mutex protecting the field padding map.
+var fieldPaddingLock sync.RWMutex
+
 type Format interface {
 	Format(r *Record) []byte
 }
@@ -33,6 +63,13 @@ type formatFunc func(*Record) []byte
 
 func (f formatFunc) Format(r *Record) []byte {
 	return f(r)
+}
+
+// TerminalStringer is an analogous interface to the stdlib stringer, allowing
+// own types to have custom shortened serialization formats when printed to the
+// screen.
+type TerminalStringer interface {
+	TerminalString() string
 }
 
 // TerminalFormat formats log records optimized for human readability on
@@ -59,6 +96,8 @@ func TerminalFormat() Format {
 			color = 32
 		case LvlDebug:
 			color = 36
+		case LvlTrace:
+			color = 34
 		}
 
 		b := &bytes.Buffer{}
