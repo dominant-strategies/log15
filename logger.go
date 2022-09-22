@@ -2,7 +2,6 @@ package log15
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-stack/stack"
@@ -11,7 +10,9 @@ import (
 const timeKey = "t"
 const lvlKey = "lvl"
 const msgKey = "msg"
+const ctxKey = "ctx"
 const errorKey = "LOG15_ERROR"
+const skipLevel = 2
 
 // Lvl is a type for predefined log levels.
 type Lvl int
@@ -99,10 +100,11 @@ type Record struct {
 
 // RecordKeyNames are the predefined names of the log props used by the Logger interface.
 type RecordKeyNames struct {
-	Time string
-	Msg  string
-	Lvl  string
-	Ctx  string
+	Time   string
+	Msg    string
+	Lvl    string
+	Ctx    string
+	ctxKey string
 }
 
 // A Logger writes key/value pairs to a Handler
@@ -130,7 +132,7 @@ type logger struct {
 	h   *swapHandler
 }
 
-func (l *logger) write(msg string, lvl Lvl, ctx []interface{}) {
+func (l *logger) write(msg string, lvl Lvl, ctx []interface{}, skip int) {
 	l.h.Log(&Record{
 		Time: time.Now(),
 		Lvl:  lvl,
@@ -165,23 +167,23 @@ func (l *logger) Trace(msg string, ctx ...interface{}) {
 }
 
 func (l *logger) Debug(msg string, ctx ...interface{}) {
-	l.write(msg, LvlDebug, ctx)
+	l.write(msg, LvlDebug, ctx, skipLevel)
 }
 
 func (l *logger) Info(msg string, ctx ...interface{}) {
-	l.write(msg, LvlInfo, ctx)
+	l.write(msg, LvlInfo, ctx, skipLevel)
 }
 
 func (l *logger) Warn(msg string, ctx ...interface{}) {
-	l.write(msg, LvlWarn, ctx)
+	l.write(msg, LvlWarn, ctx, skipLevel)
 }
 
 func (l *logger) Error(msg string, ctx ...interface{}) {
-	l.write(msg, LvlError, ctx)
+	l.write(msg, LvlError, ctx, skipLevel)
 }
 
 func (l *logger) Crit(msg string, ctx ...interface{}) {
-	l.write(msg, LvlCrit, ctx)
+	l.write(msg, LvlCrit, ctx, skipLevel)
 }
 
 func (l *logger) GetHandler() Handler {
